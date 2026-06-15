@@ -25,11 +25,11 @@ mlflow_tracking_uri = os.getenv(
 
 if not dagshub_token:
     raise EnvironmentError(
-        "DAGSHUB_USER_TOKEN is not set. Add it to mlops_capstone_project/.env"
+        "DAGSHUB_USER_TOKEN is not set. Add it to .env locally or GitHub Actions secrets in CI."
     )
 if not repo_owner or not repo_name:
     raise EnvironmentError(
-        "DAGSHUB_REPO_OWNER and DAGSHUB_REPO_NAME must be set in mlops_capstone_project/.env"
+        "DAGSHUB_REPO_OWNER and DAGSHUB_REPO_NAME must be set in .env or GitHub Actions secrets."
     )
 
 os.environ["MLFLOW_TRACKING_USERNAME"] = dagshub_token
