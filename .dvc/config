@@ -1,4 +1,4 @@
 [core]
-    remote = mylocal
-['remote "mylocal"']
-    url = ../local_s3
+    remote = myremote
+['remote "myremote"']
+    url = s3://mlops-capstone-project-594639995791

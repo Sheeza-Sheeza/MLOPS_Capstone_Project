@@ -8,7 +8,8 @@ import nltk
 import string
 from nltk.corpus import stopwords
 from nltk.stem import WordNetLemmatizer
-from src.logger import logging
+import src.logger  # configures logging handlers
+import logging
 nltk.download('wordnet')
 nltk.download('stopwords')
 

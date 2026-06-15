@@ -1,0 +1,16 @@
+# params.yaml
+data_ingestion:
+  test_size: 0.25
+  data_path: notebooks/data.csv
+  output_path: data
+  source: local  # local | s3
+  s3_bucket: mlops-capstone-project-594639995791
+  s3_file_key: data.csv
+
+feature_engineering:
+  max_features: 500
+
+prediction:
+  label_map:
+    0: negative
+    1: positive
