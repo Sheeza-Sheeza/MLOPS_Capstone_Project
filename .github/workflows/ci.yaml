@@ -89,28 +89,43 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Login to AWS ECR
+      - name: Validate AWS secrets
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          AWS_DEFAULT_REGION: ${{ secrets.AWS_REGION }}
+          AWS_REGION: ${{ secrets.AWS_REGION }}
         run: |
-          aws ecr get-login-password --region ${{ secrets.AWS_REGION }} | \
-            docker login --username AWS --password-stdin \
-            ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com
+          for name in AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_REGION; do
+            value="${!name}"
+            if [ -z "$value" ]; then
+              echo "$name is not set in GitHub repository secrets."
+              exit 1
+            fi
+            if printf '%s' "$value" | grep -q $'\n'; then
+              echo "$name contains a newline. Re-save the secret without trailing spaces or line breaks."
+              exit 1
+            fi
+          done
 
-      - name: Build Docker image
-        run: docker build -t ${{ secrets.ECR_REPOSITORY }}:latest .
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
 
-      - name: Tag Docker image
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build, tag, and push Docker image
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ECR_REPOSITORY: ${{ secrets.ECR_REPOSITORY }}
+          IMAGE_TAG: latest
         run: |
-          docker tag ${{ secrets.ECR_REPOSITORY }}:latest \
-            ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/${{ secrets.ECR_REPOSITORY }}:latest
-
-      - name: Push Docker image to ECR
-        run: |
-          docker push \
-            ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/${{ secrets.ECR_REPOSITORY }}:latest
+          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
 
       # - name: Setup kubectl
       #   uses: azure/setup-kubectl@v4
