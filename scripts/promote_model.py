@@ -1,39 +1,12 @@
 # promote model
 
-import os
-from pathlib import Path
+from src.dagshub_config import configure_dagshub
 
-import dagshub
 import mlflow
-from dotenv import load_dotenv
-
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
-load_dotenv(PROJECT_ROOT / ".env")
 
 
 def promote_model():
-    dagshub_token = os.getenv("DAGSHUB_USER_TOKEN")
-    repo_owner = os.getenv("DAGSHUB_REPO_OWNER")
-    repo_name = os.getenv("DAGSHUB_REPO_NAME")
-    mlflow_tracking_uri = os.getenv(
-        "MLFLOW_TRACKING_URI",
-        f"https://dagshub.com/{repo_owner}/{repo_name}.mlflow",
-    )
-
-    if not dagshub_token:
-        raise EnvironmentError(
-            "DAGSHUB_USER_TOKEN is not set. Add it to .env locally or GitHub Actions secrets in CI."
-        )
-    if not repo_owner or not repo_name:
-        raise EnvironmentError(
-            "DAGSHUB_REPO_OWNER and DAGSHUB_REPO_NAME must be set in .env or GitHub Actions secrets."
-        )
-
-    os.environ["MLFLOW_TRACKING_USERNAME"] = dagshub_token
-    os.environ["MLFLOW_TRACKING_PASSWORD"] = dagshub_token
-
-    dagshub.init(repo_owner=repo_owner, repo_name=repo_name, mlflow=True)
-    mlflow.set_tracking_uri(mlflow_tracking_uri)
+    configure_dagshub()
 
     client = mlflow.MlflowClient()
 

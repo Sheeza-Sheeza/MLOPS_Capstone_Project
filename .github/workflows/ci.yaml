@@ -9,6 +9,10 @@ on:
 jobs:
   project-testing:
     runs-on: ubuntu-latest
+    env:
+      DAGSHUB_USER_TOKEN: ${{ secrets.DAGSHUB_USER_TOKEN }}
+      DAGSHUB_REPO_OWNER: ${{ secrets.DAGSHUB_REPO_OWNER }}
+      DAGSHUB_REPO_NAME: ${{ secrets.DAGSHUB_REPO_NAME }}
 
     steps:
       - name: Checkout code
@@ -35,9 +39,6 @@ jobs:
 
       - name: Configure environment
         env:
-          DAGSHUB_USER_TOKEN: ${{ secrets.DAGSHUB_USER_TOKEN }}
-          DAGSHUB_REPO_OWNER: ${{ secrets.DAGSHUB_REPO_OWNER }}
-          DAGSHUB_REPO_NAME: ${{ secrets.DAGSHUB_REPO_NAME }}
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_REGION: ${{ secrets.AWS_REGION }}
@@ -45,6 +46,10 @@ jobs:
         run: |
           if [ -z "$DAGSHUB_USER_TOKEN" ]; then
             echo "DAGSHUB_USER_TOKEN is not set in GitHub repository secrets."
+            exit 1
+          fi
+          if [ -z "$DAGSHUB_REPO_OWNER" ] || [ -z "$DAGSHUB_REPO_NAME" ]; then
+            echo "DAGSHUB_REPO_OWNER and DAGSHUB_REPO_NAME must be set in GitHub repository secrets."
             exit 1
           fi
           {
@@ -62,16 +67,13 @@ jobs:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_DEFAULT_REGION: ${{ secrets.AWS_REGION }}
-          DAGSHUB_USER_TOKEN: ${{ secrets.DAGSHUB_USER_TOKEN }}
-          DAGSHUB_REPO_OWNER: ${{ secrets.DAGSHUB_REPO_OWNER }}
-          DAGSHUB_REPO_NAME: ${{ secrets.DAGSHUB_REPO_NAME }}
         run: dvc repro
 
       - name: Run model tests
         run: python -m unittest tests/test_model.py
 
       - name: Promote model to production
-        if: success()
+        if: success() && github.ref == 'refs/heads/main' && github.event_name == 'push'
         run: python scripts/promote_model.py
 
       - name: Run Flask app tests
