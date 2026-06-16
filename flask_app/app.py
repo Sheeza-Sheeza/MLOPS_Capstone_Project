@@ -23,28 +23,40 @@ warnings.filterwarnings("ignore")
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 load_dotenv(PROJECT_ROOT / ".env")
 
-dagshub_token = os.getenv("DAGSHUB_USER_TOKEN")
-repo_owner = os.getenv("DAGSHUB_REPO_OWNER")
-repo_name = os.getenv("DAGSHUB_REPO_NAME")
-mlflow_tracking_uri = os.getenv(
-    "MLFLOW_TRACKING_URI",
-    f"https://dagshub.com/{repo_owner}/{repo_name}.mlflow",
-)
+MODEL_SOURCE = os.getenv("MODEL_SOURCE", "local").lower()
 
-if not dagshub_token:
-    raise EnvironmentError(
-        "DAGSHUB_USER_TOKEN is not set. Add it to mlops_capstone_project/.env"
+
+def configure_dagshub():
+    """Configure DagsHub/MLflow only when loading models from the registry."""
+    local_model_path = PROJECT_ROOT / "models/model.pkl"
+    if MODEL_SOURCE == "local" and local_model_path.exists():
+        return
+
+    dagshub_token = os.getenv("DAGSHUB_USER_TOKEN")
+    repo_owner = os.getenv("DAGSHUB_REPO_OWNER")
+    repo_name = os.getenv("DAGSHUB_REPO_NAME")
+    mlflow_tracking_uri = os.getenv(
+        "MLFLOW_TRACKING_URI",
+        f"https://dagshub.com/{repo_owner}/{repo_name}.mlflow",
     )
-if not repo_owner or not repo_name:
-    raise EnvironmentError(
-        "DAGSHUB_REPO_OWNER and DAGSHUB_REPO_NAME must be set in mlops_capstone_project/.env"
-    )
 
-os.environ["MLFLOW_TRACKING_USERNAME"] = dagshub_token
-os.environ["MLFLOW_TRACKING_PASSWORD"] = dagshub_token
+    if not dagshub_token:
+        raise EnvironmentError(
+            "DAGSHUB_USER_TOKEN is not set. Add it to .env or pass it to the container."
+        )
+    if not repo_owner or not repo_name:
+        raise EnvironmentError(
+            "DAGSHUB_REPO_OWNER and DAGSHUB_REPO_NAME must be set in .env or passed to the container."
+        )
 
-dagshub.init(repo_owner=repo_owner, repo_name=repo_name, mlflow=True)
-mlflow.set_tracking_uri(mlflow_tracking_uri)
+    os.environ["MLFLOW_TRACKING_USERNAME"] = dagshub_token
+    os.environ["MLFLOW_TRACKING_PASSWORD"] = dagshub_token
+
+    dagshub.init(repo_owner=repo_owner, repo_name=repo_name, mlflow=True)
+    mlflow.set_tracking_uri(mlflow_tracking_uri)
+
+
+configure_dagshub()
 
 
 def load_label_map() -> dict:
@@ -94,16 +106,14 @@ MODEL_NAME = os.getenv("MLFLOW_MODEL_NAME", "my_model")
 def load_prediction_model():
     """Load model from local artifacts or MLflow registry."""
     local_model_path = PROJECT_ROOT / "models/model.pkl"
-    model_source = os.getenv("MODEL_SOURCE", "local").lower()
-
-    if model_source == "local" and local_model_path.exists():
+    if MODEL_SOURCE == "local" and local_model_path.exists():
         print(f"Loading model from local file: {local_model_path}")
         with open(local_model_path, "rb") as file:
             return pickle.load(file)
 
     client = mlflow.MlflowClient()
 
-    for stage in ("Production", "Staging"):
+    for stage in ("Production"):
         versions = client.get_latest_versions(MODEL_NAME, stages=[stage])
         if versions:
             uri = f"models:/{MODEL_NAME}/{versions[0].version}"
