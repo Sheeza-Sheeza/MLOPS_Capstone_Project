@@ -12,7 +12,10 @@ from prometheus_client import Counter, Histogram, generate_latest, CollectorRegi
 import time
 import dagshub
 
-from preprocessing_utility import preprocess_text
+try:
+    from flask_app.preprocessing_utility import preprocess_text
+except ModuleNotFoundError:
+    from preprocessing_utility import preprocess_text
 import warnings
 warnings.simplefilter("ignore", UserWarning)
 warnings.filterwarnings("ignore")

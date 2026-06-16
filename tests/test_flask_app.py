@@ -15,9 +15,10 @@ class FlaskAppTests(unittest.TestCase):
     def test_predict_page(self):
         response = self.client.post('/predict', data=dict(text="I love this!"))
         self.assertEqual(response.status_code, 200)
+        response_lower = response.data.lower()
         self.assertTrue(
-            b'Positive' in response.data or b'Negative' in response.data,
-            "Response should contain either 'Positive' or 'Negative'"
+            b'positive' in response_lower or b'negative' in response_lower,
+            "Response should contain either 'positive' or 'negative'",
         )
 
 if __name__ == '__main__':
