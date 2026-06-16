@@ -44,6 +44,11 @@ jobs:
           AWS_REGION: ${{ secrets.AWS_REGION }}
           AWS_BUCKET_NAME: ${{ secrets.AWS_BUCKET_NAME }}
         run: |
+          trim() { printf '%s' "$1" | tr -d '\n\r' | sed 's/[[:space:]]*$//'; }
+          AWS_ACCESS_KEY_ID=$(trim "$AWS_ACCESS_KEY_ID")
+          AWS_SECRET_ACCESS_KEY=$(trim "$AWS_SECRET_ACCESS_KEY")
+          AWS_REGION=$(trim "$AWS_REGION")
+          AWS_BUCKET_NAME=$(trim "$AWS_BUCKET_NAME")
           if [ -z "$DAGSHUB_USER_TOKEN" ]; then
             echo "DAGSHUB_USER_TOKEN is not set in GitHub repository secrets."
             exit 1
@@ -64,10 +69,15 @@ jobs:
 
       - name: Run DVC pipeline
         env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          AWS_DEFAULT_REGION: ${{ secrets.AWS_REGION }}
-        run: dvc repro
+          RAW_AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          RAW_AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          RAW_AWS_REGION: ${{ secrets.AWS_REGION }}
+        run: |
+          trim() { printf '%s' "$1" | tr -d '\n\r' | sed 's/[[:space:]]*$//'; }
+          export AWS_ACCESS_KEY_ID=$(trim "$RAW_AWS_ACCESS_KEY_ID")
+          export AWS_SECRET_ACCESS_KEY=$(trim "$RAW_AWS_SECRET_ACCESS_KEY")
+          export AWS_DEFAULT_REGION=$(trim "$RAW_AWS_REGION")
+          dvc repro
 
       - name: Run model tests
         run: python -m unittest tests/test_model.py
@@ -89,30 +99,30 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Validate AWS secrets
+      - name: Sanitize AWS credentials
         env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          AWS_REGION: ${{ secrets.AWS_REGION }}
+          RAW_AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          RAW_AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          RAW_AWS_REGION: ${{ secrets.AWS_REGION }}
         run: |
-          for name in AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_REGION; do
-            value="${!name}"
-            if [ -z "$value" ]; then
-              echo "$name is not set in GitHub repository secrets."
-              exit 1
-            fi
-            if printf '%s' "$value" | grep -q $'\n'; then
-              echo "$name contains a newline. Re-save the secret without trailing spaces or line breaks."
-              exit 1
-            fi
-          done
+          trim() { printf '%s' "$1" | tr -d '\n\r' | sed 's/[[:space:]]*$//'; }
+          AWS_ACCESS_KEY_ID=$(trim "$RAW_AWS_ACCESS_KEY_ID")
+          AWS_SECRET_ACCESS_KEY=$(trim "$RAW_AWS_SECRET_ACCESS_KEY")
+          AWS_DEFAULT_REGION=$(trim "$RAW_AWS_REGION")
+          if [ -z "$AWS_ACCESS_KEY_ID" ] || [ -z "$AWS_SECRET_ACCESS_KEY" ] || [ -z "$AWS_DEFAULT_REGION" ]; then
+            echo "AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, and AWS_REGION must be set in GitHub repository secrets."
+            exit 1
+          fi
+          echo "AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID" >> $GITHUB_ENV
+          echo "AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY" >> $GITHUB_ENV
+          echo "AWS_DEFAULT_REGION=$AWS_DEFAULT_REGION" >> $GITHUB_ENV
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.AWS_REGION }}
+          aws-access-key-id: ${{ env.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ env.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_DEFAULT_REGION }}
 
       - name: Login to Amazon ECR
         id: login-ecr
